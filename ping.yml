@@ -1,0 +1,6 @@
+# ping.yml
+- name: Test ping
+  hosts: all
+  tasks:
+    - name: Ping
+      ping:
