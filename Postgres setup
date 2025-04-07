@@ -1,36 +1,44 @@
----
-- name: Provision PostgreSQL Database
+- name: Install PostgreSQL 14 and create 'managedb' database
   hosts: all
   become: true
 
-  vars:
-    postgres_user: dbadmin
-    postgres_password: StrongP@ssw0rd
-    postgres_db: sampledb
-
   tasks:
-    - name: Install PostgreSQL
+    - name: Install prerequisites
       apt:
-        name: postgresql
+        name:
+          - wget
+          - gnupg
+          - lsb-release
         state: present
-      when: ansible_os_family == "Debian"
+        update_cache: true
+
+    - name: Add PostgreSQL GPG key
+      apt_key:
+        url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        state: present
+
+    - name: Add PostgreSQL 14 repository
+      apt_repository:
+        repo: "deb http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+        state: present
+        filename: "pgdg"
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install PostgreSQL 14
+      apt:
+        name: postgresql-14
+        state: present
 
     - name: Ensure PostgreSQL is running
       service:
         name: postgresql
         state: started
-        enabled: yes
+        enabled: true
 
-    - name: Set PostgreSQL password
-      become_user: postgres
-      shell: |
-        psql -c "ALTER USER {{ postgres_user }} WITH PASSWORD '{{ postgres_password }}';" || \
-        psql -c "CREATE USER {{ postgres_user }} WITH PASSWORD '{{ postgres_password }}';"
-      args:
-        executable: /bin/bash
-
-    - name: Create PostgreSQL database
+    - name: Create 'managedb' database
       become_user: postgres
       postgresql_db:
-        name: "{{ postgres_db }}"
-        owner: "{{ postgres_user }}"
+        name: managedb
