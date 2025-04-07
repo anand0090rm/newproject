@@ -1,0 +1,49 @@
+---
+- name: Install PostgreSQL 14 and create 'managedb' database on CentOS
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Install required packages
+      yum:
+        name:
+          - wget
+          - yum-utils
+        state: present
+
+    - name: Download PostgreSQL repo RPM for CentOS
+      get_url:
+        url: https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+        dest: /tmp/pgdg-redhat-repo-latest.noarch.rpm
+
+    - name: Install PostgreSQL repository RPM
+      yum:
+        name: /tmp/pgdg-redhat-repo-latest.noarch.rpm
+        state: present
+
+    - name: Disable built-in PostgreSQL module (for RHEL8+)
+      shell: dnf -qy module disable postgresql
+      when: ansible_distribution_major_version|int >= 8
+      ignore_errors: yes
+
+    - name: Install PostgreSQL 14 server
+      yum:
+        name: postgresql14-server
+        state: present
+
+    - name: Initialize PostgreSQL database
+      command: /usr/pgsql-14/bin/postgresql-14-setup initdb
+      args:
+        creates: /var/lib/pgsql/14/data/PG_VERSION
+
+    - name: Start and enable PostgreSQL 14 service
+      service:
+        name: postgresql-14
+        state: started
+        enabled: true
+
+    - name: Create 'managedb' database
+      become_user: postgres
+      command: createdb managedb
+      args:
+        creates: /var/lib/pgsql/14/data/base
