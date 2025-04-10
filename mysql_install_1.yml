@@ -1,0 +1,68 @@
+- name: Install MySQL 8.4 and create 'managedb' on Ubuntu 22.04
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Temporarily set full permissions on Ansible remote tmp dir
+      file:
+        path: /tmp/.ansible_remote_tmp
+        state: directory
+        mode: '0777'
+
+    - name: Install required packages for APT over HTTPS
+      apt:
+        name:
+          - wget
+          - gnupg
+          - lsb-release
+          - ca-certificates
+        state: present
+        update_cache: true
+
+    - name: Add MySQL APT repository
+      get_url:
+        url: https://dev.mysql.com/get/mysql-apt-config_0.8.29-1_all.deb
+        dest: /tmp/mysql-apt-config.deb
+
+    - name: Install MySQL APT config (non-interactively)
+      apt:
+        deb: /tmp/mysql-apt-config.deb
+        force: true
+
+    - name: Update APT cache after adding MySQL repo
+      apt:
+        update_cache: yes
+
+    - name: Install MySQL server (8.4)
+      apt:
+        name: mysql-server
+        state: present
+
+    - name: Ensure MySQL is started and enabled
+      service:
+        name: mysql
+        state: started
+        enabled: true
+
+    - name: Install Python MySQL bindings
+      apt:
+        name:
+          - python3-pymysql
+          - python3-pip
+        state: present
+
+    - name: Create MySQL database 'managedb'
+      mysql_db:
+        name: managedb
+        state: present
+        login_user: root
+        login_password: ""   # Update this if root password is set
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Restore secure permissions to Ansible remote tmp dir
+      file:
+        path: /tmp/.ansible_remote_tmp
+        state: directory
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+        mode: '0700'
