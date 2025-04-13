@@ -1,43 +1,49 @@
 ---
-- name: Install MongoDB and create user/database on Ubuntu 22.04
+- name: Install MongoDB 7.0 and create user/database on Ubuntu 22.04
   hosts: all
   become: true
 
   vars:
-    mongodb_repo_key_url: https://pgp.mongodb.com/server-6.0.gpg
-    mongodb_repo_key_path: /usr/share/keyrings/mongodb-server-6.0.gpg
-    mongodb_repo_entry: "deb [signed-by={{ mongodb_repo_key_path }}] https://repo.mongodb.org/apt/ubuntu {{ ansible_distribution_release }}/mongodb-org/6.0 multiverse"
+    mongodb_version: "7.0"
+    mongodb_gpg_key_url: https://pgp.mongodb.com/server-7.0.gpg
+    mongodb_gpg_key_path: /usr/share/keyrings/mongodb-server-7.0.gpg
+    mongodb_repo_file: /etc/apt/sources.list.d/mongodb-org-7.0.list
+    mongodb_repo_entry: >
+      deb [arch=amd64,signed-by={{ mongodb_gpg_key_path }}]
+      https://repo.mongodb.org/apt/ubuntu {{ ansible_distribution_release }}/mongodb-org/{{ mongodb_version }} multiverse
     mongodb_user: myappuser
     mongodb_password: StrongPass123!
     mongodb_database: myappdb
     mongodb_role: readWrite
 
   tasks:
-    - name: Install required packages
+    - name: Install required dependencies
       apt:
         name:
           - curl
           - gnupg
+          - lsb-release
         state: present
-        update_cache: true
+        update_cache: yes
 
-    - name: Download MongoDB GPG key (binary .gpg format)
+    - name: Download and install MongoDB 7 GPG key (binary format)
       get_url:
-        url: "{{ mongodb_repo_key_url }}"
-        dest: "{{ mongodb_repo_key_path }}"
+        url: "{{ mongodb_gpg_key_url }}"
+        dest: "{{ mongodb_gpg_key_path }}"
         mode: '0644'
+        force: yes
 
-    - name: Add MongoDB APT repository
+    - name: Add MongoDB 7.0 APT repository securely with signed-by
       copy:
-        dest: /etc/apt/sources.list.d/mongodb-org-6.0.list
+        dest: "{{ mongodb_repo_file }}"
         content: "{{ mongodb_repo_entry }}"
         mode: '0644'
 
-    - name: Update apt cache
+    - name: Update APT cache
       apt:
         update_cache: yes
 
-    - name: Install MongoDB
+    - name: Install MongoDB 7.0 packages
       apt:
         name: mongodb-org
         state: present
@@ -55,7 +61,7 @@
         delay: 5
         timeout: 30
 
-    - name: Create MongoDB user with database
+    - name: Create MongoDB user
       community.mongodb.mongodb_user:
         login_host: localhost
         login_port: 27017
