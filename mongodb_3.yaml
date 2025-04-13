@@ -1,0 +1,55 @@
+---
+- name: Install MongoDB 7.0 on Ubuntu 22.04 (clean and secure)
+  hosts: all
+  become: true
+
+  vars:
+    mongodb_version: "7.0"
+    gpg_key_url: "https://pgp.mongodb.com/server-{{ mongodb_version }}.asc"
+    gpg_key_path: "/usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg"
+    mongodb_repo_file: "/etc/apt/sources.list.d/mongodb-org-{{ mongodb_version }}.list"
+    mongodb_repo_content: >
+      deb [arch=amd64,signed-by={{ gpg_key_path }}]
+      https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/{{ mongodb_version }} multiverse
+
+  tasks:
+    - name: Remove old MongoDB 6.0 repo if exists
+      file:
+        path: /etc/apt/sources.list.d/mongodb-org-6.0.list
+        state: absent
+
+    - name: Install required packages
+      apt:
+        name:
+          - curl
+          - gnupg
+          - ca-certificates
+        state: present
+        update_cache: yes
+
+    - name: Download and install MongoDB GPG key
+      shell: |
+        curl -fsSL {{ gpg_key_url }} | gpg --dearmor -o {{ gpg_key_path }}
+      args:
+        creates: "{{ gpg_key_path }}"
+
+    - name: Add MongoDB 7.0 repository
+      copy:
+        dest: "{{ mongodb_repo_file }}"
+        content: "{{ mongodb_repo_content }}\n"
+        mode: '0644'
+
+    - name: Update apt cache after adding MongoDB repo
+      apt:
+        update_cache: yes
+
+    - name: Install MongoDB 7.0
+      apt:
+        name: mongodb-org
+        state: present
+
+    - name: Enable and start MongoDB
+      service:
+        name: mongod
+        state: started
+        enabled: true
