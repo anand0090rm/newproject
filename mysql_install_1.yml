@@ -21,7 +21,7 @@
 
     - name: Add MySQL APT repository
       get_url:
-        url: url: https://repo.mysql.com/mysql-apt-config_0.8.29-1_all.deb
+        url: https://repo.mysql.com/mysql-apt-config_0.8.29-1_all.deb
         dest: /tmp/mysql-apt-config.deb
 
     - name: Install MySQL APT config (non-interactively)
