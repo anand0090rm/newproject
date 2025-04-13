@@ -1,42 +1,36 @@
 ---
-- name: Install MongoDB and create user/database
+- name: Install MongoDB and create user/database on Ubuntu 22.04
   hosts: all
   become: true
 
   vars:
-    mongodb_repo_key: https://pgp.mongodb.com/server-6.0.asc
-    mongodb_repo: 'deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-6.0.gpg ] https://repo.mongodb.org/apt/ubuntu {{ ansible_distribution_release }}/mongodb-org/6.0 multiverse'
+    mongodb_repo_key_url: https://pgp.mongodb.com/server-6.0.gpg
+    mongodb_repo_key_path: /usr/share/keyrings/mongodb-server-6.0.gpg
+    mongodb_repo_entry: "deb [signed-by={{ mongodb_repo_key_path }}] https://repo.mongodb.org/apt/ubuntu {{ ansible_distribution_release }}/mongodb-org/6.0 multiverse"
     mongodb_user: myappuser
     mongodb_password: StrongPass123!
     mongodb_database: myappdb
     mongodb_role: readWrite
 
   tasks:
-    - name: Install dependencies
+    - name: Install required packages
       apt:
         name:
-          - gnupg
           - curl
+          - gnupg
         state: present
         update_cache: true
 
-    - name: Create keyring directory if it doesn't exist
-      file:
-        path: /usr/share/keyrings
-        state: directory
-        mode: '0755'
-
-    - name: Add MongoDB GPG key
+    - name: Download MongoDB GPG key (binary .gpg format)
       get_url:
-        url: "{{ mongodb_repo_key }}"
-        dest: /usr/share/keyrings/mongodb-server-6.0.gpg
+        url: "{{ mongodb_repo_key_url }}"
+        dest: "{{ mongodb_repo_key_path }}"
         mode: '0644'
 
-    - name: Add MongoDB repository
+    - name: Add MongoDB APT repository
       copy:
         dest: /etc/apt/sources.list.d/mongodb-org-6.0.list
-        content: |
-          {{ mongodb_repo }}
+        content: "{{ mongodb_repo_entry }}"
         mode: '0644'
 
     - name: Update apt cache
@@ -48,7 +42,7 @@
         name: mongodb-org
         state: present
 
-    - name: Ensure MongoDB is started and enabled
+    - name: Ensure MongoDB is running and enabled
       service:
         name: mongod
         state: started
