@@ -1,5 +1,5 @@
-- hosts: ansible-test
-  become: yes
+- hosts: all
+  become: true
   tasks:
 
     - name: Install required packages
