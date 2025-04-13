@@ -1,0 +1,50 @@
+---
+- name: Install MongoDB 7.0 securely on Ubuntu 22.04
+  hosts: all
+  become: true
+
+  vars:
+    mongodb_version: "7.0"
+    gpg_key_url: "https://pgp.mongodb.com/server-7.0.asc"
+    gpg_key_path: "/usr/share/keyrings/mongodb-server-7.0.gpg"
+    repo_file: "/etc/apt/sources.list.d/mongodb-org-7.0.list"
+    repo_content: >
+      deb [arch=amd64,signed-by={{ gpg_key_path }}]
+      https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - curl
+          - gnupg
+          - ca-certificates
+        state: present
+        update_cache: yes
+
+    - name: Download MongoDB GPG key and convert to .gpg
+      shell: |
+        curl -fsSL {{ gpg_key_url }} | gpg --dearmor -o {{ gpg_key_path }}
+      args:
+        creates: "{{ gpg_key_path }}"
+
+    - name: Add MongoDB 7.0 repository
+      copy:
+        dest: "{{ repo_file }}"
+        content: "{{ repo_content }}\n"
+        mode: '0644'
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install MongoDB
+      apt:
+        name: mongodb-org
+        state: present
+
+    - name: Enable and start MongoDB
+      service:
+        name: mongod
+        state: started
+        enabled: true
