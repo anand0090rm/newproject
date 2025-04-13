@@ -1,0 +1,43 @@
+- hosts: all
+  become: yes
+  vars:
+    mongodb_repo: "deb [arch=amd64,signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse"
+    mongodb_gpg_url: "https://pgp.mongodb.com/server-8.0.asc"
+    mongodb_gpg_key_path: "/usr/share/keyrings/mongodb-server-8.0.gpg"
+
+  tasks:
+    - name: Install required dependencies
+      apt:
+        name:
+          - curl
+          - gnupg
+          - ca-certificates
+        state: present
+        update_cache: yes
+
+    - name: Download and install MongoDB GPG key (dearmored)
+      shell: |
+        curl -fsSL {{ mongodb_gpg_url }} | gpg --dearmor -o {{ mongodb_gpg_key_path }}
+      args:
+        creates: "{{ mongodb_gpg_key_path }}"
+
+    - name: Add MongoDB repository securely
+      copy:
+        content: "{{ mongodb_repo }}\n"
+        dest: /etc/apt/sources.list.d/mongodb-org-8.0.list
+        mode: '0644'
+
+    - name: Update apt cache after adding MongoDB repo
+      apt:
+        update_cache: yes
+
+    - name: Install MongoDB 8
+      apt:
+        name: mongodb-org
+        state: latest
+
+    - name: Ensure MongoDB is started and enabled
+      service:
+        name: mongod
+        state: started
+        enabled: true
