@@ -1,49 +1,57 @@
 ---
-- name: Install MongoDB 7.0 and create user/database on Ubuntu 22.04
+- name: Install MongoDB (7.0 or 8.0) and create user/database
   hosts: all
   become: true
 
   vars:
-    mongodb_version: "7.0"
-    mongodb_gpg_key_url: https://pgp.mongodb.com/server-7.0.gpg
-    mongodb_gpg_key_path: /usr/share/keyrings/mongodb-server-7.0.gpg
-    mongodb_repo_file: /etc/apt/sources.list.d/mongodb-org-7.0.list
+    mongodb_version: "7.0"  # or "8.0"
+    mongodb_gpg_key_url: "https://pgp.mongodb.com/server-{{ mongodb_version }}.asc"
+    mongodb_gpg_key_path_raw: "/usr/share/keyrings/mongodb-server-{{ mongodb_version }}.asc"
+    mongodb_gpg_key_path_dearmored: "/usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg"
+    mongodb_repo_file: "/etc/apt/sources.list.d/mongodb-org-{{ mongodb_version }}.list"
     mongodb_repo_entry: >
-      deb [arch=amd64,signed-by={{ mongodb_gpg_key_path }}]
+      deb [arch=amd64,signed-by={{ mongodb_gpg_key_path_dearmored }}]
       https://repo.mongodb.org/apt/ubuntu {{ ansible_distribution_release }}/mongodb-org/{{ mongodb_version }} multiverse
+
     mongodb_user: myappuser
     mongodb_password: StrongPass123!
     mongodb_database: myappdb
     mongodb_role: readWrite
 
   tasks:
-    - name: Install required dependencies
+    - name: Install dependencies
       apt:
         name:
           - curl
           - gnupg
           - lsb-release
+          - gpg
         state: present
         update_cache: yes
 
-    - name: Download and install MongoDB 7 GPG key (binary format)
+    - name: Download MongoDB GPG key (ASCII)
       get_url:
         url: "{{ mongodb_gpg_key_url }}"
-        dest: "{{ mongodb_gpg_key_path }}"
+        dest: "{{ mongodb_gpg_key_path_raw }}"
         mode: '0644'
-        force: yes
 
-    - name: Add MongoDB 7.0 APT repository securely with signed-by
+    - name: Convert GPG key to binary format (dearmor)
+      command: >
+        gpg --dearmor -o {{ mongodb_gpg_key_path_dearmored }} {{ mongodb_gpg_key_path_raw }}
+      args:
+        creates: "{{ mongodb_gpg_key_path_dearmored }}"
+
+    - name: Add MongoDB APT repo
       copy:
         dest: "{{ mongodb_repo_file }}"
         content: "{{ mongodb_repo_entry }}"
         mode: '0644'
 
-    - name: Update APT cache
+    - name: Update apt cache
       apt:
         update_cache: yes
 
-    - name: Install MongoDB 7.0 packages
+    - name: Install MongoDB {{ mongodb_version }}
       apt:
         name: mongodb-org
         state: present
