@@ -1,80 +1,50 @@
 ---
-- name: Install MongoDB (7.0 or 8.0) and create user/database
+- name: Install MongoDB 7.0 on Ubuntu 22.04 using apt commands directly
   hosts: all
   become: true
 
   vars:
-    mongodb_version: "7.0"  # or "8.0"
-    mongodb_gpg_key_url: "https://pgp.mongodb.com/server-{{ mongodb_version }}.asc"
-    mongodb_gpg_key_path_raw: "/usr/share/keyrings/mongodb-server-{{ mongodb_version }}.asc"
-    mongodb_gpg_key_path_dearmored: "/usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg"
+    mongodb_version: "7.0"
+    mongodb_key_path: "/usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg"
     mongodb_repo_file: "/etc/apt/sources.list.d/mongodb-org-{{ mongodb_version }}.list"
-    mongodb_repo_entry: >
-      deb [arch=amd64,signed-by={{ mongodb_gpg_key_path_dearmored }}]
-      https://repo.mongodb.org/apt/ubuntu {{ ansible_distribution_release }}/mongodb-org/{{ mongodb_version }} multiverse
-
-    mongodb_user: myappuser
-    mongodb_password: StrongPass123!
-    mongodb_database: myappdb
-    mongodb_role: readWrite
+    mongodb_repo_line: >
+      deb [arch=amd64,signed-by={{ mongodb_key_path }}]
+      https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/{{ mongodb_version }} multiverse
 
   tasks:
-    - name: Install dependencies
+    - name: Install required tools
       apt:
         name:
           - curl
+          - ca-certificates
           - gnupg
-          - lsb-release
-          - gpg
         state: present
-        update_cache: yes
+        update_cache: true
 
-    - name: Download MongoDB GPG key (ASCII)
-      get_url:
-        url: "{{ mongodb_gpg_key_url }}"
-        dest: "{{ mongodb_gpg_key_path_raw }}"
-        mode: '0644'
-
-    - name: Convert GPG key to binary format (dearmor)
-      command: >
-        gpg --dearmor -o {{ mongodb_gpg_key_path_dearmored }} {{ mongodb_gpg_key_path_raw }}
+    - name: Download and install MongoDB GPG key
+      shell: |
+        curl -fsSL https://pgp.mongodb.com/server-{{ mongodb_version }}.asc | \
+        gpg --dearmor -o {{ mongodb_key_path }}
       args:
-        creates: "{{ mongodb_gpg_key_path_dearmored }}"
+        creates: "{{ mongodb_key_path }}"
 
-    - name: Add MongoDB APT repo
-      copy:
-        dest: "{{ mongodb_repo_file }}"
-        content: "{{ mongodb_repo_entry }}"
-        mode: '0644'
+    - name: Add MongoDB apt repository
+      shell: |
+        echo "{{ mongodb_repo_line }}" > {{ mongodb_repo_file }}
+      args:
+        creates: "{{ mongodb_repo_file }}"
 
     - name: Update apt cache
       apt:
         update_cache: yes
 
-    - name: Install MongoDB {{ mongodb_version }}
+    - name: Install MongoDB
       apt:
         name: mongodb-org
         state: present
 
-    - name: Ensure MongoDB is running and enabled
+    - name: Enable and start mongod service
       service:
         name: mongod
         state: started
         enabled: true
-
-    - name: Wait for MongoDB to become available
-      wait_for:
-        host: 127.0.0.1
-        port: 27017
-        delay: 5
-        timeout: 30
-
-    - name: Create MongoDB user
-      community.mongodb.mongodb_user:
-        login_host: localhost
-        login_port: 27017
-        database: "{{ mongodb_database }}"
-        name: "{{ mongodb_user }}"
-        password: "{{ mongodb_password }}"
-        roles: ["{{ mongodb_role }}"]
-        state: present
